@@ -81,9 +81,15 @@ def _swap_labelmap_dict(labelmap_dict):
 
 
 def main(parsed_args):
+  dir_exp = os.path.dirname(parsed_args.output_metrics)
+  name = os.path.basename(parsed_args.output_metrics).split('.json')[0]
+  Logger(dir_exp, name=name) # create/load logs
+
+  Logger()('Begin evaluation')
+
   all_box_annotations = pd.read_csv(parsed_args.input_annotations_boxes)
   all_label_annotations = pd.read_csv(parsed_args.input_annotations_labels)
-  all_annotations = pd.concat([all_box_annotations, all_label_annotations])
+  all_annotations = pd.concat([all_box_annotations, all_label_annotations], sort=True)
 
   class_label_map = _load_labelmap(parsed_args.input_class_labelmap)
   relationship_label_map = _load_labelmap(
@@ -92,7 +98,7 @@ def main(parsed_args):
   relation_evaluator = vrd_evaluation.VRDRelationDetectionEvaluator()
   phrase_evaluator = vrd_evaluation.VRDPhraseDetectionEvaluator()
 
-  for _, groundtruth in enumerate(tqdm(all_annotations.groupby('ImageID'))):
+  for _, groundtruth in enumerate(all_annotations.groupby('ImageID')):
     image_id, image_groundtruth = groundtruth
     groundtruth_dictionary = utils.build_groundtruth_vrd_dictionary(
         image_groundtruth, class_label_map, relationship_label_map)
@@ -103,7 +109,7 @@ def main(parsed_args):
                                                         groundtruth_dictionary)
 
   all_predictions = pd.read_csv(parsed_args.input_predictions)
-  for _, prediction_data in enumerate(tqdm(all_predictions.groupby('ImageID'))):
+  for _, prediction_data in enumerate(all_predictions.groupby('ImageID')):
     image_id, image_predictions = prediction_data
     prediction_dictionary = utils.build_predictions_vrd_dictionary(
         image_predictions, class_label_map, relationship_label_map)
@@ -118,11 +124,6 @@ def main(parsed_args):
   phrase_metrics = phrase_evaluator.evaluate(
       relationships=_swap_labelmap_dict(relationship_label_map))
 
-
-  dir_exp = os.path.dirname(parsed_args.output_metrics)
-  name = os.path.basename(parsed_args.output_metrics).split('.json')[0]
-  Logger(dir_exp, name=name) # create/load logs
-
   for k,v in relation_metrics.items():
     Logger().log_value('eval_epoch.{}'.format(k), v)
 
@@ -135,6 +136,8 @@ def main(parsed_args):
   Logger().log_value('eval_epoch.score', score)
 
   Logger().flush()
+
+  Logger()('End evaluation')
   # with open(parsed_args.output_metrics, 'w') as fid:
   #   io_utils.write_csv(fid, relation_metrics)
   #   io_utils.write_csv(fid, phrase_metrics)
