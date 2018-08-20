@@ -134,6 +134,8 @@ def main(parsed_args):
   score += relation_metrics['VRDMetric_Relationships_Recall@50@0.5IOU'] * 0.2
   score += phrase_metrics['VRDMetric_Phrases_mAP@0.5IOU'] * 0.4
   Logger().log_value('eval_epoch.score', score)
+  epoch_id = len(Logger().values['eval_epoch.score']) - 1
+  Logger().log_value('eval_epoch.epoch', epoch_id)
 
   Logger().flush()
 
