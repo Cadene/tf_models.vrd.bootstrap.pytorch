@@ -35,15 +35,18 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import argparse
 import pandas as pd
 from google.protobuf import text_format
+from tqdm import tqdm
 
 from object_detection.metrics import io_utils
 from object_detection.metrics import oid_vrd_challenge_evaluation_utils as utils
 from object_detection.protos import string_int_label_map_pb2
 from object_detection.utils import vrd_evaluation
 
+from bootstrap.lib.logger import Logger
 
 def _load_labelmap(labelmap_path):
   """Loads labelmap from the labelmap path.
@@ -74,7 +77,7 @@ def _swap_labelmap_dict(labelmap_dict):
   Returns:
     A dictionary mapping class name to class numerical id.
   """
-  return dict((v, k) for k, v in labelmap_dict.iteritems())
+  return {v:k for k, v in labelmap_dict.items()}
 
 
 def main(parsed_args):
@@ -89,7 +92,7 @@ def main(parsed_args):
   relation_evaluator = vrd_evaluation.VRDRelationDetectionEvaluator()
   phrase_evaluator = vrd_evaluation.VRDPhraseDetectionEvaluator()
 
-  for _, groundtruth in enumerate(all_annotations.groupby('ImageID')):
+  for _, groundtruth in enumerate(tqdm(all_annotations.groupby('ImageID'))):
     image_id, image_groundtruth = groundtruth
     groundtruth_dictionary = utils.build_groundtruth_vrd_dictionary(
         image_groundtruth, class_label_map, relationship_label_map)
@@ -100,7 +103,7 @@ def main(parsed_args):
                                                         groundtruth_dictionary)
 
   all_predictions = pd.read_csv(parsed_args.input_predictions)
-  for _, prediction_data in enumerate(all_predictions.groupby('ImageID')):
+  for _, prediction_data in enumerate(tqdm(all_predictions.groupby('ImageID'))):
     image_id, image_predictions = prediction_data
     prediction_dictionary = utils.build_predictions_vrd_dictionary(
         image_predictions, class_label_map, relationship_label_map)
@@ -115,9 +118,26 @@ def main(parsed_args):
   phrase_metrics = phrase_evaluator.evaluate(
       relationships=_swap_labelmap_dict(relationship_label_map))
 
-  with open(parsed_args.output_metrics, 'w') as fid:
-    io_utils.write_csv(fid, relation_metrics)
-    io_utils.write_csv(fid, phrase_metrics)
+
+  dir_exp = os.path.dirname(parsed_args.output_metrics)
+  name = os.path.basename(parsed_args.output_metrics).split('.json')[0]
+  Logger(dir_exp, name=name) # create/load logs
+
+  for k,v in relation_metrics.items():
+    Logger().log_value('eval_epoch.{}'.format(k), v)
+
+  for k,v in phrase_metrics.items():
+    Logger().log_value('eval_epoch.{}'.format(k), v)
+
+  score = relation_metrics['VRDMetric_Relationships_mAP@0.5IOU'] * 0.4
+  score += relation_metrics['VRDMetric_Relationships_Recall@50@0.5IOU'] * 0.2
+  score += phrase_metrics['VRDMetric_Phrases_mAP@0.5IOU'] * 0.4
+  Logger().log_value('eval_epoch.score', score)
+
+  Logger().flush()
+  # with open(parsed_args.output_metrics, 'w') as fid:
+  #   io_utils.write_csv(fid, relation_metrics)
+  #   io_utils.write_csv(fid, phrase_metrics)
 
 
 if __name__ == '__main__':
@@ -148,7 +168,6 @@ if __name__ == '__main__':
       required=True,
       help="""OpenImages Challenge relationship labelmap.""")
   parser.add_argument(
-      '--output_metrics', required=True, help='Output file with csv metrics')
-
+      '--output_metrics', required=True, help='Output file with json metrics')
   args = parser.parse_args()
   main(args)

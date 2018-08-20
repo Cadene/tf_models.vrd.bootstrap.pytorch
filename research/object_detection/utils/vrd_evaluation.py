@@ -252,12 +252,12 @@ class VRDDetectionEvaluator(object_detection_evaluation.DetectionEvaluator):
             recall_100,
     }
     if relationships:
-      for key, average_precision in average_precisions.iteritems():
+      for key, average_precision in average_precisions.items():
         vrd_metrics[self._metric_prefix + 'AP@{}IOU/{}'.format(
             self._matching_iou_threshold,
             relationships[key])] = average_precision
     else:
-      for key, average_precision in average_precisions.iteritems():
+      for key, average_precision in average_precisions.items():
         vrd_metrics[self._metric_prefix + 'AP@{}IOU/{}'.format(
             self._matching_iou_threshold, key)] = average_precision
 
@@ -352,7 +352,7 @@ class VRDPhraseDetectionEvaluator(VRDDetectionEvaluator):
         where the named bounding box is computed as an enclosing bounding box
         of all bounding boxes of the i-th input structure.
     """
-    first_box_key = groundtruth_box_tuples.dtype.fields.keys()[0]
+    first_box_key = list(groundtruth_box_tuples.dtype.fields.keys())[0]
     miny = groundtruth_box_tuples[first_box_key][:, 0]
     minx = groundtruth_box_tuples[first_box_key][:, 1]
     maxy = groundtruth_box_tuples[first_box_key][:, 2]
@@ -388,7 +388,7 @@ class VRDPhraseDetectionEvaluator(VRDDetectionEvaluator):
         where the named bounding box is computed as an enclosing bounding box
         of all bounding boxes of the i-th input structure.
     """
-    first_box_key = detections_box_tuples.dtype.fields.keys()[0]
+    first_box_key = list(detections_box_tuples.dtype.fields.keys())[0]
     miny = detections_box_tuples[first_box_key][:, 0]
     minx = detections_box_tuples[first_box_key][:, 1]
     maxy = detections_box_tuples[first_box_key][:, 2]
@@ -546,8 +546,7 @@ class _VRDDetectionEvaluation(object):
       tp_fp_labels = np.concatenate(self._tp_fp_labels)
       relation_field_values = np.concatenate(self._relation_field_values)
 
-    for relation_field_value, _ in (
-        self._num_gt_instances_per_relationship.iteritems()):
+    for relation_field_value, _ in self._num_gt_instances_per_relationship.items():
       precisions, recalls = metrics.compute_precision_recall(
           scores[relation_field_values == relation_field_value],
           tp_fp_labels[relation_field_values == relation_field_value],
@@ -556,7 +555,7 @@ class _VRDDetectionEvaluation(object):
           relation_field_value] = metrics.compute_average_precision(
               precisions, recalls)
 
-    self._mean_average_precision = np.mean(self._average_precisions.values())
+    self._mean_average_precision = np.mean(list(self._average_precisions.values()))
 
     self._precisions, self._recalls = metrics.compute_precision_recall(
         scores, tp_fp_labels, self._num_gt_instances)
